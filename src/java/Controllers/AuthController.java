@@ -9,6 +9,7 @@ import Model.Persona;
 import Model.Rol;
 import Model.Usuario;
 import Util.AuditoriaHelper;
+import Util.JwtHelper;
 import Util.RateLimiter;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
@@ -17,6 +18,7 @@ import java.io.PrintWriter;
 import java.util.regex.Pattern;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,6 +33,16 @@ import jakarta.servlet.http.HttpSession;
  * que no existe ninguna forma de registrarse como ADMIN desde este
  * formulario. Las cuentas ADMIN solo se crean desde UsuarioController por
  * otro administrador ya autenticado.
+ *
+ * Política de sesión por rol:
+ *  - ADMIN: sesión normal de servidor (cookie JSESSIONID sin Max-Age), así
+ *    que muere sola al cerrar el navegador; mientras el navegador siga
+ *    abierto, no expira por inactividad salvo que pasen ADMIN_SESION_SEG.
+ *  - CLIENTE: además de la sesión normal, se emite una cookie persistente
+ *    ("jx_remember", un JWT propio firmado con HS256, ver Util/JwtHelper)
+ *    con Max-Age de 7 días. Si el cliente vuelve tras cerrar el navegador y
+ *    ya no tiene sesión activa, "verificar" reconoce esa cookie y le
+ *    recrea la sesión sola, sin pedirle loguearse de nuevo.
  */
 @WebServlet(name = "AuthController", urlPatterns = {"/AuthController"})
 public class AuthController extends HttpServlet {
@@ -42,6 +54,11 @@ public class AuthController extends HttpServlet {
 
     private static final Pattern PASSWORD_VALIDA = Pattern.compile("^(?=.*[A-Z])(?=.*\\d).{8,}$");
     private static final Pattern PHONE = Pattern.compile("^[0-9+() \\-]{7,20}$");
+
+    private static final String COOKIE_REMEMBER = "jx_remember";
+    private static final int REMEMBER_DIAS = 7;
+    private static final int ADMIN_SESION_SEG = -1;              // -1 = nunca expira por inactividad; solo muere al cerrar el navegador (cookie de sesión)
+    private static final int CLIENTE_SESION_SEG = 12 * 60 * 60; // la persistencia real de 7 días la da la cookie, no esto
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -56,8 +73,20 @@ public class AuthController extends HttpServlet {
 
             if ("verificar".equals(action)) {
                 HttpSession session = request.getSession(false);
-                if (session != null && session.getAttribute("usuario") != null) {
-                    Usuario us = (Usuario) session.getAttribute("usuario");
+                Usuario us = session == null ? null : (Usuario) session.getAttribute("usuario");
+
+                // Sin sesión activa: intenta reconocer la cookie persistente del cliente
+                // (solo aplica a CLIENTE; un admin siempre debe volver a loguearse).
+                if (us == null) {
+                    us = intentarReautenticarPorCookie(request);
+                    if (us != null) {
+                        HttpSession nueva = request.getSession(true);
+                        nueva.setAttribute("usuario", us);
+                        nueva.setMaxInactiveInterval(CLIENTE_SESION_SEG);
+                    }
+                }
+
+                if (us != null) {
                     jsonResponse.addProperty("success", true);
                     jsonResponse.addProperty("logueado", true);
                     jsonResponse.addProperty("usuario", us.getUsuario());
@@ -105,7 +134,15 @@ public class AuthController extends HttpServlet {
                 if (us != null && us.getUsuario() != null) {
                     HttpSession session = request.getSession(true);
                     session.setAttribute("usuario", us);
-                    session.setMaxInactiveInterval(1800);
+
+                    if (us.getRol() == Rol.CLIENTE) {
+                        session.setMaxInactiveInterval(CLIENTE_SESION_SEG);
+                        emitirCookieRemember(request, response, us.getId_usuario());
+                    } else {
+                        session.setMaxInactiveInterval(ADMIN_SESION_SEG);
+                        // Los admins no reciben cookie persistente: su sesión debe morir
+                        // al cerrar el navegador (JSESSIONID por defecto, sin Max-Age).
+                    }
 
                     jsonResponse.addProperty("success", true);
                     jsonResponse.addProperty("message", "Inicio de sesión exitoso");
@@ -137,6 +174,8 @@ public class AuthController extends HttpServlet {
                 if (session != null) {
                     session.invalidate();
                 }
+                borrarCookieRemember(request, response);
+
                 jsonResponse.addProperty("success", true);
                 jsonResponse.addProperty("message", "Sesión cerrada exitosamente");
 
@@ -155,6 +194,47 @@ public class AuthController extends HttpServlet {
             } catch (IOException ignored) {
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Sesión persistente de 7 días (solo CLIENTE)
+    // ------------------------------------------------------------------
+
+    private void emitirCookieRemember(HttpServletRequest request, HttpServletResponse response, int idUsuario) {
+        String token = JwtHelper.generar(idUsuario, REMEMBER_DIAS);
+        Cookie cookie = new Cookie(COOKIE_REMEMBER, token);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(REMEMBER_DIAS * 24 * 60 * 60);
+        cookie.setSecure(request.isSecure()); // Secure solo si ya estás en HTTPS
+        response.addCookie(cookie);
+    }
+
+    private void borrarCookieRemember(HttpServletRequest request, HttpServletResponse response) {
+        Cookie cookie = new Cookie(COOKIE_REMEMBER, "");
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        cookie.setSecure(request.isSecure());
+        response.addCookie(cookie);
+    }
+
+    /** Si hay una cookie "jx_remember" válida y no vencida, devuelve al Usuario dueño (siempre CLIENTE); si no, null. */
+    private Usuario intentarReautenticarPorCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+
+        for (Cookie c : cookies) {
+            if (COOKIE_REMEMBER.equals(c.getName())) {
+                Integer idUsuario = JwtHelper.validar(c.getValue());
+                if (idUsuario == null) return null;
+                Usuario us = uDao.SearchById(idUsuario);
+                // Defensa extra: aunque nunca deberíamos emitir esta cookie para un ADMIN,
+                // si por lo que sea llegara una, la ignoramos igual.
+                return (us != null && us.getRol() == Rol.CLIENTE) ? us : null;
+            }
+        }
+        return null;
     }
 
     /**

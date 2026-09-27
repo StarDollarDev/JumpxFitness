@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes · Admin</title>
+    <link rel="icon" type="image/png" href="assets/img/logo.png">
+    <div id="head-placeholder"></div>
+</head>
+<body class="jx-show-loading">
+    <div id="jx-loading-overlay">
+        <img src="assets/img/logo.png" alt="JumpxFitness">
+        <div class="spinner-border" role="status"></div>
+        <p>Cargando panel administrativo...</p>
+    </div>
+    <header id="header-placeholder"></header>
+    <main class="container mt-5 mb-5">
+        <h2 class="section-title mb-4"><i class="bi bi-people me-2"></i>Clientes</h2>
+        <div class="card shadow border-0">
+            <div class="card-body p-4">
+                <p class="text-muted small">
+                    Todos los clientes: los que se registraron ellos mismos desde la web (tienen usuario)
+                    y los que diste de alta tú directamente (sin cuenta). El plan y el monto son los del
+                    último pago o registro de cada uno.
+                </p>
+                <table id="tabla-clientes" class="table table-striped table-hover w-100">
+                    <thead class="table-info">
+                        <tr><th>Nombre</th><th>Documento</th><th>Teléfono</th><th>Cuenta</th><th>Plan actual</th><th>Monto</th><th>Vigencia</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+    <footer id="footer-placeholder"></footer>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/pages/admin_clientes.js"></script>
+</body>
+</html>

@@ -2,10 +2,15 @@ package Controllers;
 
 import Dao.ClienteDaoImpl;
 import Dao.PersonaDaoImpl;
+import Dao.RegistroJumpingDaoImpl;
+import Dao.UsuarioDaoImpl;
 import Interface.ICliente;
 import Interface.IPersona;
 import Model.Cliente;
 import Model.Persona;
+import Model.RegistroJumping;
+import Model.Rol;
+import Model.Usuario;
 import Util.AuditoriaHelper;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -17,6 +22,8 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
+import java.time.LocalDate;
 import java.util.List;
 
 @WebServlet(name = "ClienteController", urlPatterns = {"/ClienteController"})
@@ -24,6 +31,8 @@ public class ClienteController extends HttpServlet {
 
     private final ICliente cDao = new ClienteDaoImpl();
     private final IPersona pDao = new PersonaDaoImpl();
+    private final RegistroJumpingDaoImpl registroDao = new RegistroJumpingDaoImpl();
+    private final UsuarioDaoImpl usuarioDao = new UsuarioDaoImpl();
     private final Gson gson = new Gson();
 
     @Override
@@ -42,6 +51,53 @@ public class ClienteController extends HttpServlet {
             if ("listar".equals(action)) {
                 List<Cliente> lista = cDao.lista();
                 JsonArray jsonArray = gson.toJsonTree(lista).getAsJsonArray();
+
+                jsonResponse.addProperty("success", true);
+                jsonResponse.add("data", jsonArray);
+                out.print(jsonResponse.toString());
+            } else if ("listarConPlan".equals(action)) {
+                HttpSession session = request.getSession(false);
+                Usuario sesion = session == null ? null : (Usuario) session.getAttribute("usuario");
+                if (sesion == null || sesion.getRol() != Rol.ADMIN) {
+                    response.setStatus(403);
+                    jsonResponse.addProperty("success", false);
+                    jsonResponse.addProperty("message", "No tienes permiso para ver esto.");
+                    out.print(jsonResponse.toString());
+                    return;
+                }
+
+                JsonArray jsonArray = new JsonArray();
+                for (Cliente c : cDao.lista()) {
+                    JsonObject fila = new JsonObject();
+                    fila.addProperty("id_cliente", c.getId_cliente());
+                    fila.add("persona", gson.toJsonTree(c.getPersona()));
+
+                    // ¿Este cliente tiene cuenta propia (se registró él mismo) o lo dio de
+                    // alta el admin sin cuenta? Ambos casos son válidos y conviven.
+                    Usuario cuenta = c.getPersona() != null ? usuarioDao.SearchByPersonaId(c.getPersona().getId_persona()) : null;
+                    fila.addProperty("tieneCuenta", cuenta != null);
+                    fila.addProperty("usuario", cuenta != null ? cuenta.getUsuario() : null);
+
+                    // Plan actual: el más reciente de sus registros (igual que en su propio dashboard).
+                    List<RegistroJumping> registros = registroDao.SearchByClienteId(c.getId_cliente());
+                    if (registros != null && !registros.isEmpty()) {
+                        RegistroJumping ultimo = registros.get(0);
+                        LocalDate inicio = ultimo.getFechaIngreso().toLocalDate();
+                        LocalDate vence = inicio.plusDays(ultimo.getPlan().getDiasVigencia());
+                        long diasRestantes = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), vence);
+
+                        fila.addProperty("tienePlan", true);
+                        fila.addProperty("nombrePlan", ultimo.getPlan().getNombre());
+                        fila.addProperty("montoPlan", ultimo.getMonto());
+                        fila.addProperty("fechaInicioPlan", inicio.toString());
+                        fila.addProperty("diasRestantes", diasRestantes);
+                        fila.addProperty("vencido", diasRestantes < 0);
+                    } else {
+                        fila.addProperty("tienePlan", false);
+                    }
+
+                    jsonArray.add(fila);
+                }
 
                 jsonResponse.addProperty("success", true);
                 jsonResponse.add("data", jsonArray);

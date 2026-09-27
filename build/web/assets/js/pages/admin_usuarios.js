@@ -46,7 +46,7 @@ let usuariosCache = [];
         }
 
         async function cargarTablaUsuarios() {
-            const r = await jxApi('UsuarioController', 'GET', { action: 'listar' });
+            const r = await jxApi('UsuarioController', 'GET', { action: 'listarPorRol', rol: 'ADMIN' });
             usuariosCache = r.data || [];
             const tbody = document.querySelector('#tabla-usuarios tbody');
             tbody.innerHTML = usuariosCache.map(u => `

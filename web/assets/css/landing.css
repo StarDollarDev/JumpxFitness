@@ -111,3 +111,83 @@
     .footer-bottom { align-items:flex-start; flex-direction:column; }
     .planes-viewport { padding-left:30px; padding-right:30px; }
 }
+
+/* ===== Galería de cancha ===== */
+.cancha-galeria-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+}
+.cancha-item {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    cursor: pointer;
+    aspect-ratio: 4 / 3;
+    background: #f4e7e8;
+}
+.cancha-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform .3s ease;
+    display: block;
+}
+.cancha-item:hover img { transform: scale(1.06); }
+.cancha-item .cancha-play-badge {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(20, 10, 12, .28);
+    color: #fff;
+    font-size: 2.4rem;
+}
+.cancha-item .cancha-item-titulo {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 8px 12px;
+    font-size: .82rem;
+    color: #fff;
+    background: linear-gradient(0deg, rgba(0,0,0,.55), transparent);
+}
+
+/* ===== Banner de eventos de sábados ===== */
+.banner-sabados {
+    position: relative;
+    padding: 44px 0;
+    color: #fff;
+    background: linear-gradient(135deg, #f7dde0 0%, #efa2a8 48%, #d96b73 100%);
+    background-size: cover;
+    background-position: center;
+    overflow: hidden;
+}
+.banner-sabados::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 10, 12, .32);
+}
+.banner-sabados .banner-sabados-contenido {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+.banner-sabados .banner-sabados-eyebrow {
+    display: inline-block;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    font-size: .8rem;
+    background: rgba(255,255,255,.2);
+    border-radius: 999px;
+    padding: 4px 14px;
+    margin-bottom: 8px;
+}
+.banner-sabados h3 { font-weight: 900; font-size: clamp(1.4rem, 3vw, 2rem); margin: 0; }
+.banner-sabados p { margin: 6px 0 0; opacity: .95; }

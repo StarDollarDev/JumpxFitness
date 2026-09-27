@@ -14,4 +14,5 @@ public interface IUsuario {
     public Usuario validate(String user, String pass);
     public Usuario SearchByUsername(String username);
     public List<Usuario> SearchByRol(String rol);
+    public Usuario SearchByPersonaId(int idPersona);
 }

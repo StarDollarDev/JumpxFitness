@@ -185,9 +185,110 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('#planes-next').addEventListener('click', () => moveCarousel(1));
     $('#contact-main-cta').addEventListener('click', () => abrirLead());
     await cargarPlanesLanding();
+    await cargarBannerSabados();
+    await cargarGaleriaCancha();
     window.addEventListener('resize', () => {
         const oldVisible = carouselVisible;
         updateVisibleCount();
         if (oldVisible !== carouselVisible) renderDots();
     });
 });
+
+/* ============================================================
+   Banner de eventos de sábados
+   ============================================================ */
+async function cargarBannerSabados() {
+    try {
+        const res = await fetch('BannerEventoController?action=activo');
+        const r = await res.json();
+        const wrap = $('#banner-sabados-wrap');
+        const cont = $('#banner-sabados');
+
+        if (!r.success || !r.hayBanner) {
+            wrap.classList.add('d-none');
+            return;
+        }
+        const b = r.data;
+        const estiloFondo = b.imagenFondo ? ` style="background-image:url('${escapeHtml(b.imagenFondo)}')"` : '';
+        cont.innerHTML = `
+            <div class="banner-sabados"${estiloFondo}>
+                <div class="container banner-sabados-contenido">
+                    <div>
+                        <span class="banner-sabados-eyebrow"><i class="bi bi-stars me-1"></i>Solo los sábados</span>
+                        <h3>${escapeHtml(b.titulo)}</h3>
+                        ${b.descripcion ? `<p>${escapeHtml(b.descripcion)}</p>` : ''}
+                    </div>
+                    ${b.horaTexto ? `<div class="fs-5 fw-bold text-nowrap"><i class="bi bi-clock me-2"></i>${escapeHtml(b.horaTexto)}</div>` : ''}
+                </div>
+            </div>
+        `;
+        wrap.classList.remove('d-none');
+    } catch (e) {
+        console.error('No se pudo cargar el banner de sábados:', e);
+    }
+}
+
+/* ============================================================
+   Galería de cancha (fotos subidas + videos embebidos)
+   ============================================================ */
+let canchaLightboxModal;
+
+function urlVideoEmbebido(url) {
+    // Convierte links normales de YouTube a su versión /embed/ para el iframe.
+    const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{6,})/);
+    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+    return url; // Facebook u otros: se usa tal cual (debe ser ya un link "embebible")
+}
+
+async function cargarGaleriaCancha() {
+    const status = $('#cancha-galeria-status');
+    const grid = $('#cancha-galeria');
+    try {
+        const res = await fetch('GaleriaController?action=listar');
+        const r = await res.json();
+        const items = r.data || [];
+
+        if (!r.success || items.length === 0) {
+            status.textContent = 'Pronto subiremos fotos y videos de la cancha.';
+            return;
+        }
+
+        grid.innerHTML = items.map((item, i) => {
+            if (item.tipo === 'VIDEO') {
+                return `
+                    <div class="cancha-item" onclick="abrirCanchaLightbox(${i})" data-tipo="video" data-url="${escapeHtml(item.url)}">
+                        <div class="cancha-play-badge"><i class="bi bi-play-circle-fill"></i></div>
+                        ${item.titulo ? `<div class="cancha-item-titulo">${escapeHtml(item.titulo)}</div>` : ''}
+                    </div>`;
+            }
+            return `
+                <div class="cancha-item" onclick="abrirCanchaLightbox(${i})" data-tipo="foto" data-url="${escapeHtml(item.url)}">
+                    <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.titulo || 'Foto de la cancha')}" loading="lazy">
+                    ${item.titulo ? `<div class="cancha-item-titulo">${escapeHtml(item.titulo)}</div>` : ''}
+                </div>`;
+        }).join('');
+
+        window.__canchaItems = items;
+        status.classList.add('d-none');
+        grid.classList.remove('d-none');
+    } catch (e) {
+        console.error('No se pudo cargar la galería de cancha:', e);
+        status.textContent = 'No se pudo cargar la galería.';
+    }
+}
+
+function abrirCanchaLightbox(indice) {
+    const item = (window.__canchaItems || [])[indice];
+    if (!item) return;
+    const body = $('#cancha-lightbox-body');
+
+    body.innerHTML = item.tipo === 'VIDEO'
+        ? `<div class="ratio ratio-16x9"><iframe src="${escapeHtml(urlVideoEmbebido(item.url))}" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>`
+        : `<img src="${escapeHtml(item.url)}" class="w-100 rounded-3" alt="${escapeHtml(item.titulo || '')}">`;
+
+    canchaLightboxModal = canchaLightboxModal || bootstrap.Modal.getOrCreateInstance($('#cancha-lightbox-modal'));
+    canchaLightboxModal.show();
+
+    // Al cerrar, se quita el iframe/imagen para que un video no siga sonando de fondo.
+    $('#cancha-lightbox-modal').addEventListener('hidden.bs.modal', () => { body.innerHTML = ''; }, { once: true });
+}

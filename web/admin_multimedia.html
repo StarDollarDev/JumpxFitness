@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multimedia · Admin</title>
+    <link rel="icon" type="image/png" href="assets/img/logo.png">
+    <div id="head-placeholder"></div>
+    <link rel="stylesheet" href="assets/css/landing.css">
+    <style>
+        .miniatura-preview { width: 100%; max-width: 220px; border-radius: 12px; object-fit: cover; aspect-ratio: 4/3; }
+        .item-admin-card { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid #eedcdf; }
+        .item-admin-card img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+        .item-admin-card .item-admin-btn-eliminar {
+            position: absolute; top: 6px; right: 6px;
+        }
+        .item-admin-card .item-admin-tipo {
+            position: absolute; bottom: 0; left: 0; right: 0; padding: 4px 8px;
+            font-size: .78rem; color: #fff; background: rgba(0,0,0,.55);
+        }
+    </style>
+</head>
+<body class="jx-show-loading">
+    <div id="jx-loading-overlay">
+        <img src="assets/img/logo.png" alt="JumpxFitness">
+        <div class="spinner-border" role="status"></div>
+        <p>Cargando panel administrativo...</p>
+    </div>
+    <header id="header-placeholder"></header>
+    <main class="container mt-5 mb-5">
+        <h2 class="section-title mb-4"><i class="bi bi-images me-2"></i>Multimedia</h2>
+
+        <ul class="nav nav-tabs mb-4" id="multimedia-tabs">
+            <li class="nav-item"><button class="nav-link active" data-tab="cancha" type="button">Fotos/Videos de Cancha</button></li>
+            <li class="nav-item"><button class="nav-link" data-tab="banner" type="button">Banner de Sábados</button></li>
+        </ul>
+
+        <!-- ===== GALERÍA DE CANCHA ===== -->
+        <div id="tab-cancha" class="multimedia-pane">
+            <div class="row g-4">
+                <div class="col-md-5">
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-image me-1"></i>Subir foto</h6>
+                            <div id="foto-alert" class="alert d-none py-2"></div>
+                            <form id="form-foto">
+                                <div class="mb-2">
+                                    <input type="file" class="form-control" id="foto-archivo" accept=".jpg,.jpeg,.png,.webp" required>
+                                    <div class="form-text">JPG, PNG o WEBP. Máximo 5 MB.</div>
+                                </div>
+                                <img id="foto-preview" class="miniatura-preview d-none mb-2" alt="Vista previa">
+                                <div class="mb-2">
+                                    <input type="text" class="form-control" id="foto-titulo" placeholder="Título (opcional)" maxlength="120">
+                                </div>
+                                <button type="submit" class="btn btn-jx-primary w-100" id="foto-submit">
+                                    <i class="bi bi-upload me-1"></i>Subir foto
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-camera-reels me-1"></i>Agregar video</h6>
+                            <p class="text-muted small">Pega un link de YouTube (o Facebook). No se sube el archivo, solo se embebe.</p>
+                            <div id="video-alert" class="alert d-none py-2"></div>
+                            <form id="form-video">
+                                <div class="mb-2">
+                                    <input type="url" class="form-control" id="video-url" placeholder="https://youtube.com/watch?v=..." required>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="text" class="form-control" id="video-titulo" placeholder="Título (opcional)" maxlength="120">
+                                </div>
+                                <button type="submit" class="btn btn-jx-primary w-100">
+                                    <i class="bi bi-plus-lg me-1"></i>Agregar video
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-7">
+                    <h6 class="fw-bold mb-3">Elementos actuales</h6>
+                    <div id="galeria-admin-grid" class="row g-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== BANNER DE SÁBADOS ===== -->
+        <div id="tab-banner" class="multimedia-pane d-none">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-0">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold mb-3"><i class="bi bi-megaphone me-1"></i>Banner destacado</h6>
+                            <div id="banner-alert" class="alert d-none py-2"></div>
+                            <form id="form-banner">
+                                <input type="hidden" id="banner-id" value="0">
+                                <div class="mb-2">
+                                    <label class="form-label">Título *</label>
+                                    <input type="text" class="form-control" id="banner-titulo" required maxlength="150">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Descripción</label>
+                                    <textarea class="form-control" id="banner-descripcion" rows="2" maxlength="300"></textarea>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Texto de hora (ej. "Desde las 8:00 PM")</label>
+                                    <input type="text" class="form-control" id="banner-hora" maxlength="60">
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Imagen de fondo (opcional)</label>
+                                    <input type="file" class="form-control" id="banner-imagen" accept=".jpg,.jpeg,.png,.webp">
+                                </div>
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" id="banner-activo">
+                                    <label class="form-check-label" for="banner-activo">Mostrar en la web ahora</label>
+                                </div>
+                                <button type="submit" class="btn btn-jx-primary w-100">
+                                    <i class="bi bi-save me-1"></i>Guardar banner
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary w-100 mt-2 d-none" id="banner-nuevo">
+                                    <i class="bi bi-plus-lg me-1"></i>Crear uno nuevo
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="fw-bold mb-3">Vista previa</h6>
+                    <div id="banner-preview"></div>
+                    <hr class="my-4">
+                    <h6 class="fw-bold mb-3">Banners guardados</h6>
+                    <div id="banner-lista" class="list-group"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer id="footer-placeholder"></footer>
+    <script src="assets/js/main.js"></script>
+    <script src="assets/js/pages/admin_multimedia.js"></script>
+</body>
+</html>

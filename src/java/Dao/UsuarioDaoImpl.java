@@ -296,6 +296,34 @@ public class UsuarioDaoImpl implements IUsuario {
     }
 
     @Override
+    public Usuario SearchByPersonaId(int idPersona) {
+        Usuario usuario = null;
+        PreparedStatement st = null;
+        ResultSet rs = null;
+        try {
+            cn = ConexionSqlSingleton.getConnection();
+            String query = "SELECT * FROM usuario WHERE id_persona = ?";
+            st = cn.prepareStatement(query);
+            st.setInt(1, idPersona);
+            rs = st.executeQuery();
+            if (rs.next()) {
+                usuario = new Usuario();
+                usuario.setId_usuario(rs.getInt("id_usuario"));
+                usuario.setUsuario(rs.getString("usuario"));
+                usuario.setContraseña(rs.getString("contrasena"));
+                usuario.setRol(Rol.valueOf(rs.getString("rol")));
+                Persona p = personaDAO.SearchById(rs.getInt("id_persona"));
+                usuario.setPersona(p);
+            }
+        } catch (Exception e) {
+            System.out.println("Error al buscar usuario por id_persona: " + e.getMessage());
+        } finally {
+            cerrarRecursos(rs, st);
+        }
+        return usuario;
+    }
+
+    @Override
     public Usuario validate(String user, String passPlano) {
 
         // 1) Buscamos SOLO por nombre de usuario (ya no por contraseña en el SQL)

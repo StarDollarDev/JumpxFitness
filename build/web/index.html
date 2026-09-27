@@ -69,6 +69,11 @@
         </div>
     </section>
 
+    <!-- Banner de eventos de sábados: se llena por JS solo si hay uno activo -->
+    <section id="banner-sabados-wrap" class="d-none">
+        <div id="banner-sabados"></div>
+    </section>
+
     <section id="planes" class="section-space">
         <div class="container">
             <div class="section-heading text-center mx-auto">
@@ -89,6 +94,25 @@
                     <i class="bi bi-chevron-right"></i>
                 </button>
                 <div id="planes-dots" class="carousel-dots" aria-label="Indicadores del carrusel"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="cancha" class="section-space">
+        <div class="container">
+            <div class="section-heading text-center mx-auto">
+                <span class="eyebrow eyebrow-soft">Más que Jumping</span>
+                <h2>Alquila nuestra cancha</h2>
+                <p>Deportes, amigos y buena energía. Mira cómo son nuestras instalaciones y resérvala para tu próximo partido o evento.</p>
+            </div>
+
+            <div id="cancha-galeria-status" class="text-center text-muted py-4">Cargando galería...</div>
+            <div id="cancha-galeria" class="cancha-galeria-grid d-none" aria-label="Galería de la cancha"></div>
+
+            <div class="text-center mt-4">
+                <a href="#contacto" class="btn btn-jx-primary btn-lg rounded-pill px-4">
+                    <i class="bi bi-calendar2-check me-1"></i>Reservar cancha
+                </a>
             </div>
         </div>
     </section>
@@ -213,6 +237,16 @@
                     <button type="submit" class="btn btn-jx-primary rounded-pill px-4" id="lead-submit">Enviar solicitud</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox de la galería de cancha -->
+<div class="modal fade" id="cancha-lightbox-modal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-transparent border-0">
+            <button type="button" class="btn-close btn-close-white ms-auto me-2 mt-2" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            <div id="cancha-lightbox-body" class="p-2"></div>
         </div>
     </div>
 </div>
