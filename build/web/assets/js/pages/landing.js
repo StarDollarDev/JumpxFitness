@@ -187,6 +187,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await cargarPlanesLanding();
     await cargarBannerSabados();
     await cargarGaleriaCancha();
+    await verificarSesionPublica();
     window.addEventListener('resize', () => {
         const oldVisible = carouselVisible;
         updateVisibleCount();
@@ -209,9 +210,11 @@ async function cargarBannerSabados() {
             return;
         }
         const b = r.data;
-        const estiloFondo = b.imagenFondo ? ` style="background-image:url('${escapeHtml(b.imagenFondo)}')"` : '';
+
+        // Primero mostramos el banner con su degradado. Solo usamos la imagen
+        // si el archivo realmente existe; así una ruta rota no deja el banner gris.
         cont.innerHTML = `
-            <div class="banner-sabados"${estiloFondo}>
+            <div class="banner-sabados">
                 <div class="container banner-sabados-contenido">
                     <div>
                         <span class="banner-sabados-eyebrow"><i class="bi bi-stars me-1"></i>Solo los sábados</span>
@@ -222,6 +225,17 @@ async function cargarBannerSabados() {
                 </div>
             </div>
         `;
+
+        if (b.imagenFondo) {
+            const imagen = new Image();
+            imagen.onload = () => {
+                const banner = $('#banner-sabados .banner-sabados');
+                if (banner) banner.style.backgroundImage = 'url(\"' + b.imagenFondo + '\")';
+            };
+            // Si falla, no hacemos nada: queda visible el degradado original.
+            imagen.src = b.imagenFondo;
+        }
+
         wrap.classList.remove('d-none');
     } catch (e) {
         console.error('No se pudo cargar el banner de sábados:', e);
@@ -263,7 +277,7 @@ async function cargarGaleriaCancha() {
             }
             return `
                 <div class="cancha-item" onclick="abrirCanchaLightbox(${i})" data-tipo="foto" data-url="${escapeHtml(item.url)}">
-                    <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.titulo || 'Foto de la cancha')}" loading="lazy">
+                    <img src="${escapeHtml(item.url)}" alt="${escapeHtml(item.titulo || 'Foto de la cancha')}" loading="lazy" onerror="this.onerror=null; this.src='assets/img/logo.png';">
                     ${item.titulo ? `<div class="cancha-item-titulo">${escapeHtml(item.titulo)}</div>` : ''}
                 </div>`;
         }).join('');
@@ -284,11 +298,46 @@ function abrirCanchaLightbox(indice) {
 
     body.innerHTML = item.tipo === 'VIDEO'
         ? `<div class="ratio ratio-16x9"><iframe src="${escapeHtml(urlVideoEmbebido(item.url))}" allowfullscreen allow="autoplay; encrypted-media"></iframe></div>`
-        : `<img src="${escapeHtml(item.url)}" class="w-100 rounded-3" alt="${escapeHtml(item.titulo || '')}">`;
+        : `<img src="${escapeHtml(item.url)}" class="w-100 rounded-3" alt="${escapeHtml(item.titulo || '')}" onerror="this.onerror=null; this.src='assets/img/logo.png';">`;
 
     canchaLightboxModal = canchaLightboxModal || bootstrap.Modal.getOrCreateInstance($('#cancha-lightbox-modal'));
     canchaLightboxModal.show();
 
     // Al cerrar, se quita el iframe/imagen para que un video no siga sonando de fondo.
     $('#cancha-lightbox-modal').addEventListener('hidden.bs.modal', () => { body.innerHTML = ''; }, { once: true });
+}
+
+/* ============================================================
+   Navbar público consciente de la sesión: si hay una sesión activa
+   (de admin o de cliente, incluida la persistente de 7 días de un
+   cliente que ya cerró el navegador), reemplaza "Iniciar Sesión" por
+   el nombre de la cuenta y un acceso directo a su panel.
+   ============================================================ */
+const JX_HOME_POR_ROL_PUBLICO = { ADMIN: 'admin_dashboard.html', CLIENTE: 'cliente_dashboard.html' };
+
+async function verificarSesionPublica() {
+    try {
+        const res = await fetch('AuthController?action=verificar');
+        const r = await res.json();
+        if (!r.success || !r.logueado) return; // se queda con "Iniciar Sesión" (comportamiento por defecto)
+
+        $('#nav-auth-guest').classList.add('d-none');
+        $('#nav-auth-user').classList.remove('d-none');
+        $('#nav-auth-nombre').textContent = r.nombreCompleto || r.usuario;
+
+        const panel = $('#nav-auth-panel');
+        panel.href = JX_HOME_POR_ROL_PUBLICO[r.rol] || 'index.html';
+
+        $('#nav-auth-logout').addEventListener('click', async (e) => {
+            e.preventDefault();
+            await fetch('AuthController', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=logout'
+            });
+            window.location.reload();
+        });
+    } catch (e) {
+        console.error('No se pudo verificar la sesión:', e);
+    }
 }

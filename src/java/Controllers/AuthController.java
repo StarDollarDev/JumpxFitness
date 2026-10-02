@@ -91,6 +91,10 @@ public class AuthController extends HttpServlet {
                     jsonResponse.addProperty("logueado", true);
                     jsonResponse.addProperty("usuario", us.getUsuario());
                     jsonResponse.addProperty("rol", us.getRol().name());
+                    if (us.getPersona() != null) {
+                        String nombreCompleto = (us.getPersona().getNombre() + " " + us.getPersona().getApellido()).trim();
+                        jsonResponse.addProperty("nombreCompleto", nombreCompleto.isEmpty() ? us.getUsuario() : nombreCompleto);
+                    }
                 } else {
                     jsonResponse.addProperty("success", true);
                     jsonResponse.addProperty("logueado", false);
