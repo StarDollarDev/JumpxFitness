@@ -3,7 +3,6 @@ package Util;
 import jakarta.servlet.http.Part;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -12,16 +11,18 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Guarda una imagen subida por un <input type="file"> dentro de la propia
- * carpeta desplegada de la app (web/assets/uploads/&lt;subcarpeta&gt;/).
+ * Guarda una imagen subida por un <input type="file"> en
+ * ${catalina.base}/jx-uploads/&lt;subcarpeta&gt;/ — FUERA de la carpeta
+ * desplegada de la app. Así un Clean and Build + Deploy nunca la toca: las
+ * fotos ya subidas sobreviven a cualquier redespliegue.
  *
- * IMPORTANTE (avísalo si no lo sabías): si vuelves a desplegar el .war desde
- * cero (no un simple redeploy en caliente), Tomcat puede recrear la carpeta
- * de la app y estos archivos se perderían. Para un uso serio a futuro,
- * conviene guardar las imágenes fuera del .war (una carpeta aparte en el
- * servidor) o en un servicio externo; para el tamaño de este proyecto, esto
- * alcanza siempre que no borres/redespliegues desde cero sin respaldar
- * assets/uploads.
+ * No hace falta configurar nada: ${catalina.base} ya lo da el propio
+ * servidor (es la misma carpeta donde vive tu conf/jx-notify.properties),
+ * así que la carpeta de subidas queda en ${catalina.base}/jx-uploads/,
+ * se crea sola la primera vez que alguien sube algo.
+ *
+ * Los archivos se sirven con ArchivoEstaticoController, mapeado a
+ * "/uploads/*", porque viven fuera de web/ y Tomcat no los serviría solo.
  */
 public final class SubidaArchivoHelper {
 
@@ -33,11 +34,10 @@ public final class SubidaArchivoHelper {
 
     /**
      * @param part       el archivo recibido (request.getPart("archivo"))
-     * @param realPathWeb el real path de /web que da el servlet (getServletContext().getRealPath("/"))
      * @param subcarpeta "cancha" o "banner"
-     * @return la ruta relativa a guardar en la BD (ej. "assets/uploads/cancha/uuid.jpg"), o null si falló validación
+     * @return la ruta relativa a guardar en la BD (ej. "uploads/cancha/uuid.jpg")
      */
-    public static String guardarImagen(Part part, String realPathWeb, String subcarpeta) throws IOException {
+    public static String guardarImagen(Part part, String subcarpeta) throws IOException {
         if (part == null || part.getSize() == 0) {
             throw new IllegalArgumentException("No se recibió ningún archivo.");
         }
@@ -52,7 +52,7 @@ public final class SubidaArchivoHelper {
         }
 
         String nombreArchivo = UUID.randomUUID() + "." + extension;
-        Path carpetaDestino = Paths.get(realPathWeb, "assets", "uploads", subcarpeta);
+        Path carpetaDestino = carpetaBase().resolve(subcarpeta);
         Files.createDirectories(carpetaDestino);
 
         Path destino = carpetaDestino.resolve(nombreArchivo);
@@ -60,20 +60,46 @@ public final class SubidaArchivoHelper {
             Files.copy(in, destino, StandardCopyOption.REPLACE_EXISTING);
         }
 
-        return "assets/uploads/" + subcarpeta + "/" + nombreArchivo;
+        return "uploads/" + subcarpeta + "/" + nombreArchivo;
     }
 
     /** Borra un archivo previamente guardado con guardarImagen(), si existe. */
-    public static void eliminarSiExiste(String rutaRelativa, String realPathWeb) {
-        if (rutaRelativa == null || rutaRelativa.isBlank() || !rutaRelativa.startsWith("assets/uploads/")) {
+    public static void eliminarSiExiste(String rutaRelativa) {
+        if (rutaRelativa == null || !rutaRelativa.startsWith("uploads/")) {
             return; // nunca borres nada que no hayamos guardado nosotros mismos
         }
         try {
-            Path archivo = Paths.get(realPathWeb, rutaRelativa);
-            Files.deleteIfExists(archivo);
+            Path archivo = resolverDentroDeBase(rutaRelativa.substring("uploads/".length()));
+            if (archivo != null) {
+                Files.deleteIfExists(archivo);
+            }
         } catch (IOException e) {
             System.err.println("No se pudo borrar el archivo " + rutaRelativa + ": " + e.getMessage());
         }
+    }
+
+    /**
+     * Resuelve "cancha/uuid.jpg" a la ruta real dentro de la carpeta base,
+     * verificando que no se escape de ella (protección contra path traversal
+     * con "../"). La usa ArchivoEstaticoController para servir el archivo.
+     * @return la ruta real, o null si el valor recibido es sospechoso.
+     */
+    public static Path resolverDentroDeBase(String rutaRelativa) throws IOException {
+        Path base = carpetaBase().normalize();
+        Path candidato = base.resolve(rutaRelativa).normalize();
+        if (!candidato.startsWith(base)) {
+            return null; // alguien intentó salirse de la carpeta de subidas
+        }
+        return candidato;
+    }
+
+    private static Path carpetaBase() {
+        String base = System.getProperty("catalina.base");
+        if (base == null || base.isBlank()) {
+            // No debería pasar dentro de Tomcat; red de seguridad por si acaso.
+            base = System.getProperty("java.io.tmpdir");
+        }
+        return Paths.get(base, "jx-uploads");
     }
 
     private static String extraerExtension(String nombreArchivo) {

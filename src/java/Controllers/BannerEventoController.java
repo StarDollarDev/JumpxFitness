@@ -93,11 +93,10 @@ public class BannerEventoController extends HttpServlet {
                 // La imagen es opcional; si mandan una nueva, reemplaza (y borra) la anterior.
                 Part part = request.getPart("imagen");
                 if (part != null && part.getSize() > 0) {
-                    String realPath = getServletContext().getRealPath("/");
                     try {
-                        String nuevaRuta = SubidaArchivoHelper.guardarImagen(part, realPath, "banner");
+                        String nuevaRuta = SubidaArchivoHelper.guardarImagen(part, "banner");
                         if (imagenFondo != null) {
-                            SubidaArchivoHelper.eliminarSiExiste(imagenFondo, realPath);
+                            SubidaArchivoHelper.eliminarSiExiste(imagenFondo);
                         }
                         imagenFondo = nuevaRuta;
                     } catch (IllegalArgumentException ex) {
@@ -133,7 +132,7 @@ public class BannerEventoController extends HttpServlet {
                 boolean ok = bannerDao.eliminar(idBanner);
                 if (ok) {
                     if (banner != null && banner.getImagenFondo() != null) {
-                        SubidaArchivoHelper.eliminarSiExiste(banner.getImagenFondo(), getServletContext().getRealPath("/"));
+                        SubidaArchivoHelper.eliminarSiExiste(banner.getImagenFondo());
                     }
                     AuditoriaHelper.registrar(request, "DELETE", "banner_evento_jx", idBanner, "Banner de sábados eliminado");
                 }

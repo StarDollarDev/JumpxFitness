@@ -22,10 +22,12 @@ import jakarta.servlet.http.Part;
 
 /**
  * Galería pública de fotos y videos de la cancha.
- * Fotos: se suben como archivo (jpg/png/webp, máx. 5MB) y se guardan en
- * web/assets/uploads/cancha/. Videos: NO se suben como archivo (pesarían
- * demasiado para este servidor); se guarda un link embebido (YouTube,
- * Facebook, etc.) que el frontend muestra en un iframe.
+ * Fotos: se suben como archivo (jpg/png/webp, máx. 5MB) y se guardan FUERA
+ * del proyecto, en ${catalina.base}/jx-uploads/cancha/ (ver
+ * Util/SubidaArchivoHelper), servidas por ArchivoEstaticoController en
+ * "/uploads/*". Videos: NO se suben como archivo (pesarían demasiado para
+ * este servidor); se guarda un link embebido (YouTube, Facebook, etc.) que
+ * el frontend muestra en un iframe.
  */
 @WebServlet(name = "GaleriaController", urlPatterns = {"/GaleriaController"})
 @MultipartConfig(maxFileSize = 5L * 1024 * 1024, maxRequestSize = 6L * 1024 * 1024)
@@ -76,11 +78,10 @@ public class GaleriaController extends HttpServlet {
             if ("subirFoto".equals(action)) {
                 Part part = request.getPart("archivo");
                 String titulo = limpiar(request, "titulo");
-                String realPath = getServletContext().getRealPath("/");
 
                 String ruta;
                 try {
-                    ruta = SubidaArchivoHelper.guardarImagen(part, realPath, "cancha");
+                    ruta = SubidaArchivoHelper.guardarImagen(part, "cancha");
                 } catch (IllegalArgumentException ex) {
                     out.addProperty("success", false);
                     out.addProperty("message", ex.getMessage());
@@ -143,7 +144,7 @@ public class GaleriaController extends HttpServlet {
                 boolean ok = galeriaDao.eliminar(idItem);
                 if (ok) {
                     if ("FOTO".equals(item.getTipo())) {
-                        SubidaArchivoHelper.eliminarSiExiste(item.getUrl(), getServletContext().getRealPath("/"));
+                        SubidaArchivoHelper.eliminarSiExiste(item.getUrl());
                     }
                     AuditoriaHelper.registrar(request, "DELETE", "galeria_cancha_jx", idItem,
                             "Elemento de galería de cancha eliminado");

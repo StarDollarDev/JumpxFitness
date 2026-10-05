@@ -173,7 +173,128 @@ public class ReservaCanchaController extends HttpServlet {
         System.out.println("Action: " + action);
 
         try (PrintWriter out = response.getWriter()) {
-            if ("insertar".equals(action)) {
+            if ("solicitarPublica".equals(action)) {
+
+                // Solicitud pública: NO requiere iniciar sesión ni tener cuenta.
+                // La solicitud queda PENDIENTE para que el administrador la confirme.
+                String nombre = request.getParameter("nombre");
+                String telefono = request.getParameter("telefono");
+                String deporte = request.getParameter("deporte");
+                String fechaStr = request.getParameter("fecha");
+                String horaInicioStr = request.getParameter("horaInicio");
+                String horaFinStr = request.getParameter("horaFin");
+
+                if (nombre == null || nombre.trim().isEmpty()
+                        || telefono == null || telefono.trim().isEmpty()
+                        || deporte == null || deporte.isEmpty()
+                        || fechaStr == null || fechaStr.isEmpty()
+                        || horaInicioStr == null || horaInicioStr.isEmpty()
+                        || horaFinStr == null || horaFinStr.isEmpty()) {
+
+                    jsonResponse.addProperty("success", false);
+                    jsonResponse.addProperty("message",
+                            "Nombre, teléfono, deporte, fecha y horario son requeridos");
+                    out.print(jsonResponse.toString());
+                    return;
+                }
+
+                try {
+                    LocalDate fechaLocal = LocalDate.parse(fechaStr);
+                    LocalTime horaInicioLocal = LocalTime.parse(horaInicioStr);
+                    LocalTime horaFinLocal = LocalTime.parse(horaFinStr);
+
+                    if (fechaLocal.isBefore(LocalDate.now())) {
+                        jsonResponse.addProperty("success", false);
+                        jsonResponse.addProperty("message", "La fecha de reserva no puede ser anterior a hoy");
+                        out.print(jsonResponse.toString());
+                        return;
+                    }
+
+                    long minutosReserva = java.time.Duration
+                            .between(horaInicioLocal, horaFinLocal).toMinutes();
+
+                    if (minutosReserva <= 0) {
+                        jsonResponse.addProperty("success", false);
+                        jsonResponse.addProperty("message", "La hora de fin debe ser posterior a la hora de inicio");
+                        out.print(jsonResponse.toString());
+                        return;
+                    }
+
+                    if (minutosReserva != 60 && minutosReserva != 90 && minutosReserva != 120) {
+                        jsonResponse.addProperty("success", false);
+                        jsonResponse.addProperty("message", "La reserva debe ser de 1, 1.5 o 2 horas");
+                        out.print(jsonResponse.toString());
+                        return;
+                    }
+
+                    // La reserva pública no crea una cuenta de acceso.
+                    // Se crea únicamente el registro de cliente necesario para
+                    // relacionarlo con la reserva.
+                    Persona persona = new Persona();
+                    persona.setNombre(nombre.trim());
+                    persona.setApellido("Reserva web");
+                    persona.setDocumento("WEB");
+                    persona.setNumeroDoc("WEB-" + System.currentTimeMillis());
+                    persona.setTelefono(telefono.trim());
+
+                    Cliente nuevoCliente = new Cliente();
+                    nuevoCliente.setPersona(persona);
+
+                    if (!cDao.insertar(nuevoCliente)) {
+                        jsonResponse.addProperty("success", false);
+                        jsonResponse.addProperty("message", "No se pudo registrar los datos del cliente");
+                        out.print(jsonResponse.toString());
+                        return;
+                    }
+
+                    // Mantiene el precio que actualmente utiliza el formulario
+                    // administrativo del proyecto.
+                    double precioPorHora = 30.0;
+                    double total = (minutosReserva / 60.0) * precioPorHora;
+
+                    ReservaCancha reserva = new ReservaCancha();
+                    reserva.setCliente(nuevoCliente);
+                    reserva.setDeporte(Deporte.valueOf(deporte));
+                    reserva.setPrecioHora(precioPorHora);
+                    reserva.setMetodoPago(null);
+                    reserva.setFecha(Date.valueOf(fechaLocal));
+                    reserva.setHoraInicio(Time.valueOf(horaInicioLocal));
+                    reserva.setHoraFin(Time.valueOf(horaFinLocal));
+                    reserva.setMontoAdelanto(0.0);
+                    reserva.setFaltaPagar(total);
+                    reserva.setTotal(total);
+                    reserva.setEstadoPago(EstadoPago.PENDIENTE);
+                    reserva.setEstadoReserva(EstadoReserva.PENDIENTE);
+
+                    boolean resultado = rDao.insertar(reserva);
+
+                    jsonResponse.addProperty("success", resultado);
+
+                    if (resultado) {
+                        jsonResponse.addProperty("message",
+                                "Solicitud de reserva enviada correctamente");
+                        jsonResponse.addProperty("id", reserva.getId_reserva());
+                        jsonResponse.add("data", gson.toJsonTree(reserva));
+
+                        AuditoriaHelper.registrar(request, "INSERT", "reservacancha",
+                                reserva.getId_reserva(),
+                                "Solicitud pública de reserva de " + nombre.trim()
+                                + " el " + fechaStr + " " + horaInicioStr + "-" + horaFinStr);
+                    } else {
+                        jsonResponse.addProperty("message",
+                                "No se pudo registrar la solicitud de reserva");
+                    }
+
+                    out.print(jsonResponse.toString());
+
+                } catch (Exception e) {
+                    jsonResponse.addProperty("success", false);
+                    jsonResponse.addProperty("message", "No se pudo procesar la solicitud: " + e.getMessage());
+                    out.print(jsonResponse.toString());
+                }
+
+            } else if ("insertar".equals(action)) {
+
                 
                 String idClienteStr = request.getParameter("idCliente");
                 String deporte = request.getParameter("deporte");
